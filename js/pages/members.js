@@ -3,6 +3,7 @@ import { openModal, confirmModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
 import { icon } from '../utils/icon.js';
 import { escapeHtml } from '../utils/format.js';
+import { isNfcSupported, isSecureContextOk, startNfcScan } from '../services/nfc.js';
 
 export async function mountPage() {
   const listEl = document.getElementById('member-list');
@@ -86,10 +87,54 @@ export async function mountPage() {
     });
   }
 
+  function attachUidScanner(bodyEl) {
+    const scanBtn = bodyEl.querySelector('#member-uid-scan-btn');
+    const uidInput = bodyEl.querySelector('#member-uid');
+    let stopFn = null;
+
+    scanBtn.addEventListener('click', async () => {
+      if (stopFn) {
+        stopFn();
+        stopFn = null;
+        scanBtn.textContent = '感應卡片';
+        return;
+      }
+      if (!isNfcSupported() || !isSecureContextOk()) {
+        showToast('此裝置或瀏覽器不支援 Web NFC，請改用 Android 手機上的 Chrome 開啟本頁面感應', 'warning');
+        return;
+      }
+      scanBtn.textContent = '感應中…（點擊取消）';
+      try {
+        stopFn = await startNfcScan(
+          (uid) => {
+            uidInput.value = uid;
+            showToast('已讀取卡號', 'success');
+            stopFn?.();
+            stopFn = null;
+            scanBtn.textContent = '感應卡片';
+          },
+          (err) => showToast(err.message || 'NFC 讀取發生錯誤', 'danger')
+        );
+      } catch (err) {
+        showToast(err.message || '無法啟動 NFC 感應', 'danger');
+        scanBtn.textContent = '感應卡片';
+      }
+    });
+
+    // 回傳清理函式：不管 modal 是被儲存/取消按鈕關閉，還是點 X／背景／Esc 關閉，
+    // 都要停止還在進行中的 NFC 感應，避免讀卡機持續佔用。
+    return () => {
+      stopFn?.();
+      stopFn = null;
+    };
+  }
+
   function openMemberForm(existing) {
     const isEdit = Boolean(existing);
-    openModal({
+    let stopUidScan = null;
+    const { bodyEl } = openModal({
       title: isEdit ? '編輯成員' : '新增成員',
+      onClose: () => stopUidScan?.(),
       bodyHtml: `
         <div class="field">
           <label class="field-label" for="member-name">姓名</label>
@@ -97,7 +142,10 @@ export async function mountPage() {
         </div>
         <div class="field">
           <label class="field-label" for="member-uid">學生證卡號 UID（選填）</label>
-          <input class="input" id="member-uid" value="${isEdit ? escapeHtml(existing.cardUID || '') : ''}" placeholder="以 NFC 感應學生證後取得的序號" />
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input class="input" id="member-uid" style="flex:1; min-width:160px;" value="${isEdit ? escapeHtml(existing.cardUID || '') : ''}" placeholder="以 NFC 感應學生證後取得的序號" />
+            <button type="button" class="btn btn-ghost" id="member-uid-scan-btn" style="flex:none;">感應卡片</button>
+          </div>
         </div>
         <div class="field">
           <label class="field-label" for="member-note">備註（選填）</label>
@@ -134,6 +182,7 @@ export async function mountPage() {
         },
       ],
     });
+    stopUidScan = attachUidScanner(bodyEl);
   }
 
   addBtn.addEventListener('click', () => openMemberForm(null));

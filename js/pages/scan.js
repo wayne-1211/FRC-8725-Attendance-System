@@ -1,4 +1,4 @@
-import { listSessions } from '../services/db.js';
+import { listSessions, addSession } from '../services/db.js';
 import {
   listMembers,
   findMemberByUID,
@@ -10,11 +10,15 @@ import {
 import { isNfcSupported, isSecureContextOk, startNfcScan } from '../services/nfc.js';
 import { openModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
-import { formatTime, escapeHtml } from '../utils/format.js';
+import { formatTime, todayDateInputValue, escapeHtml } from '../utils/format.js';
 
 export async function mountPage(context) {
+  const sessionBar = document.getElementById('scan-session-bar');
   const sessionSelect = document.getElementById('session-select');
   const supportBanner = document.getElementById('scan-support-banner');
+  const noSessionCard = document.getElementById('scan-no-session-card');
+  const createTodayBtn = document.getElementById('scan-create-today-btn');
+  const activeArea = document.getElementById('scan-active-area');
   const target = document.getElementById('scan-target');
   const statusTitle = document.getElementById('scan-status-title');
   const statusDesc = document.getElementById('scan-status-desc');
@@ -28,7 +32,8 @@ export async function mountPage(context) {
 
   const isDemoMode = context?.params?.get('demo') === '1';
 
-  let sessions = [];
+  let sessions = []; // 僅包含「今天」建立的場次
+  let supportOk = isDemoMode; // demo 模式一律視為支援
   let stopScan = null;
   let isScanning = false;
   const pendingUIDs = new Set(); // avoids duplicate "register new member" modals for the same tap
@@ -46,35 +51,92 @@ export async function mountPage(context) {
     if (isDemoMode) {
       supportBanner.innerHTML =
         '<div class="warning-banner">模擬模式（Demo Mode）已啟用：目前略過真實 NFC 讀卡，僅供電腦開發測試使用，正式上線請移除網址中的 ?demo=1。</div>';
+      supportOk = true;
       return;
     }
     if (isNfcSupported() && isSecureContextOk()) {
       supportBanner.innerHTML = '';
+      supportOk = true;
       return;
     }
     const reason = !isSecureContextOk()
       ? 'Web NFC 需要 HTTPS 環境。'
       : '此瀏覽器不支援 Web NFC。請改用 Android 手機上的 Chrome 瀏覽器開啟本頁面，並確認手機已開啟 NFC 功能。';
     supportBanner.innerHTML = `<div class="error-banner">${reason}</div>`;
-    setActionDisabled(true);
+    supportOk = false;
   }
 
-  function setActionDisabled(disabled) {
+  function updateActionAvailability() {
+    const disabled = !supportOk || !sessions.length;
     toggleBtn.disabled = disabled;
     demoScanBtn.disabled = disabled;
   }
 
   async function loadSessions() {
-    sessions = await listSessions();
+    const all = await listSessions();
+    const todayStr = todayDateInputValue();
+    sessions = all.filter((s) => s.date === todayStr);
+    renderSessionAvailability();
+    updateActionAvailability();
+  }
+
+  function renderSessionAvailability() {
     if (!sessions.length) {
-      sessionSelect.innerHTML = '<option value="">尚無場次，請先建立場次</option>';
-      setActionDisabled(true);
-      statusDesc.textContent = '請先到「場次管理」建立一個場次';
+      sessionBar.style.display = 'none';
+      noSessionCard.style.display = 'block';
+      activeArea.style.display = 'none';
       return;
     }
+    sessionBar.style.display = 'flex';
+    noSessionCard.style.display = 'none';
+    activeArea.style.display = 'block';
     sessionSelect.innerHTML = sessions
-      .map((s) => `<option value="${s.id}">${escapeHtml(s.name)}${s.date ? '（' + escapeHtml(s.date) + '）' : ''}</option>`)
+      .map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`)
       .join('');
+  }
+
+  function openCreateTodaySessionModal() {
+    const todayStr = todayDateInputValue();
+    const { close } = openModal({
+      title: '新增今日場次',
+      bodyHtml: `
+        <p style="margin:0 0 14px; font-size:12.5px; color:var(--text-muted);">日期：${escapeHtml(todayStr)}（今天，點名讀卡僅能對今天的場次操作）</p>
+        <div class="field">
+          <label class="field-label" for="today-session-name">場次名稱</label>
+          <input class="input" id="today-session-name" placeholder="例如：今日工作坊" autofocus />
+        </div>
+        <div class="field">
+          <label class="field-label" for="today-session-note">備註（選填）</label>
+          <input class="input" id="today-session-note" placeholder="例如：地點、講師" />
+        </div>
+      `,
+      buttons: [
+        { label: '取消', className: 'btn-ghost', onClick: (c) => c() },
+        {
+          label: '建立並開始點名',
+          className: 'btn-primary',
+          onClick: async (c) => {
+            const name = document.getElementById('today-session-name').value.trim();
+            const note = document.getElementById('today-session-note').value.trim();
+            if (!name) {
+              showToast('請輸入場次名稱', 'warning');
+              return;
+            }
+            try {
+              await addSession({ name, date: todayStr, note });
+              showToast('已建立今日場次', 'success');
+              c();
+              await loadSessions();
+              await refreshRecentList();
+              if (isDemoMode) await populateDemoUidOptions();
+            } catch (err) {
+              showToast(`建立場次失敗：${err.message || ''}`, 'danger');
+            }
+          },
+        },
+      ],
+    });
+    void close;
   }
 
   async function refreshRecentList() {
@@ -287,6 +349,7 @@ export async function mountPage(context) {
     if (e.key === 'Enter') handleDemoScan();
   });
   sessionSelect.addEventListener('change', refreshRecentList);
+  createTodayBtn.addEventListener('click', openCreateTodaySessionModal);
 
   if (isDemoMode) {
     setupDemoUI();

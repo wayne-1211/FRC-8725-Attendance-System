@@ -1,9 +1,9 @@
 /**
  * Opens a modal.
- * @param {{title:string, bodyHtml:string, buttons?: Array<{label:string, className?:string, onClick:(close:Function)=>void}>}} opts
+ * @param {{title:string, bodyHtml:string, buttons?: Array<{label:string, className?:string, onClick:(close:Function)=>void}>, onClose?: Function}} opts
  * @returns {{close: Function, bodyEl: HTMLElement}}
  */
-export function openModal({ title, bodyHtml, buttons = [] }) {
+export function openModal({ title, bodyHtml, buttons = [], onClose }) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
 
@@ -28,7 +28,13 @@ export function openModal({ title, bodyHtml, buttons = [] }) {
 
   document.body.appendChild(overlay);
 
-  const close = () => overlay.remove();
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    if (typeof onClose === 'function') onClose();
+  };
 
   overlay.querySelector('[data-close-modal]').addEventListener('click', close);
   overlay.addEventListener('click', (e) => {
