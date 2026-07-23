@@ -1,0 +1,58 @@
+{
+  "name": "Team 8725 Attendance System",
+  "short_name": "Team 8725",
+  "description": "Misty Panther · Workshop 點名系統（NFC 學生證 + Firebase）",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "lang": "zh-Hant",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "images/icons/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/icons/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/icons/pwa/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "images/icons/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "點名讀卡",
+      "short_name": "讀卡",
+      "description": "使用 NFC 感應學生證進行點名",
+      "url": "./#/scan",
+      "icons": [{ "src": "images/icons/nfc.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "資料匯總",
+      "short_name": "匯總",
+      "description": "查看場次、出席名單與統計",
+      "url": "./#/summary",
+      "icons": [{ "src": "images/icons/home.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

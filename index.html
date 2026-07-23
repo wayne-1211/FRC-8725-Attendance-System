@@ -10,6 +10,18 @@
   <meta property="og:description" content="Misty Panther · Workshop" />
   <link rel="icon" type="image/png" href="images/brand/team-logo.png" />
 
+  <!-- PWA: manifest + icons -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="images/icons/pwa/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="images/icons/pwa/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="images/icons/pwa/icon-512.png" />
+
+  <!-- PWA: standalone install behaviour on iOS Safari -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Team 8725" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/components.css" />
@@ -33,5 +45,18 @@
   </div>
 
   <script type="module" src="js/core/main.js"></script>
+  <script>
+    // Register the service worker for offline support / installability.
+    // Uses a relative path + scope so it works both at a domain root and at
+    // a GitHub Pages project subpath (e.g. /FRC8725-Attendance-System/).
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swUrl = new URL('service-worker.js', document.baseURI);
+        navigator.serviceWorker.register(swUrl, { scope: './' }).catch((err) => {
+          console.error('Service worker registration failed', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
